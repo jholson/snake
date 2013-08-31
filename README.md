@@ -6,4 +6,4 @@ Snake... next-gen
 Developer set-up
 =====
 
-test
+We use the Boost library: http://www.boost.org/ 
