@@ -1,5 +1,5 @@
 CC = /usr/bin/g++
-CFLAGS =
+CFLAGS = -lncurses
 
 all: snake
 
