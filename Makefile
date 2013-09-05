@@ -2,9 +2,9 @@ CC = /usr/bin/g++
 CFLAGS =
 LIBS = -lncurses
 
-all: snake
+.PHONY: all clean
 
-.PHONY: clean
+all: snake
 
 snake: snake.cc
 	$(CC) $(CFLAGS) -o snake snake.cc $(LIBS)
