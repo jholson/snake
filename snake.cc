@@ -1,4 +1,7 @@
 #include <ncurses.h>
+#include <string>
+
+const std::string title = "SNAKE";
 
 void configure_stdscr();
 
@@ -7,27 +10,33 @@ int main()
 	// TODO: For testin the keypad() behavior
 	char c;
 
+	int row, col;
+
 	// Start curses mode
 	initscr();
 
 	// Configure the screen we initialized above
 	configure_stdscr();
 
-	printw("Hello World!");
+	// Store the row and col of stdscr
+	getmaxyx(stdscr, row, col);
+
+	// Print title screen in the center
+	mvprintw(row/2, (col - title.length())/2, "%s", title.c_str());
+
+	c = getch();
+
+	// Get rid of the title before printing our next string. Note that it doesn't
+	// "redraw the screen from scratch" so there's no blinking (i.e. what you'd see with
+	// clear())
+	erase();
+	// Now print something else to test addstr()
+	mvaddstr(row/2, (col - title.length())/2, "WHOA");
 
 	refresh();
 
-	// Wait for user input
+	// Wait for user input before terminating
 	c = getch();
-	printw("%c", c);
-	c = getch();
-	printw("%c", c);
-	c = getch();
-	printw("%c", c);
-	c = getch();
-	printw("%c", c);
-	c = getch();
-	printw("%c", c);
 
 	// End curses mode
 	endwin();
