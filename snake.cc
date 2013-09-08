@@ -2,92 +2,71 @@
 #include <string>
 #include <vector>
 
-const std::string title = "SNAKE";
-const std::string test = "WHOA";
+enum GameState
+{
+	Menu,
+	InGame,
+	// TODO Feature!!!!!!!!!!!
+	Scoreboard
+};
 
+int g_row, g_col;
+GameState g_state;
+
+void menu_mode();
 void configure_stdscr();
 void configure_colors();
 
 int main()
 {
-	char c;
-	std::string s;
-	std::vector<char> writable_s(s.size() + 1);
-	std::copy(s.begin(), s.end(), writable_s.begin());
-
-	int row, col;
-
-	// Start curses mode with color
+	// Initialize ncurses stuff
 	initscr();
 	start_color();
-
-	// Configure the screen we initialized above
 	configure_stdscr();
 	configure_colors();
 
-	// Store the row and col of stdscr
-	getmaxyx(stdscr, row, col);
+	// Initialize game g_state
+	getmaxyx(stdscr, g_row, g_col);
+	g_state = Menu;
 
-	while (1)
-	{
-		erase();
-		// Print title screen in the center
-		mvprintw(row/2, (col - title.length())/2, "%s", title.c_str());
-		// Test A_STANDOUT
-		attrset(A_STANDOUT);
-		mvprintw(row/2 + 1, (col - title.length())/2, "%s", title.c_str());
-		// Test A_UNDERLINE
-		attrset(A_UNDERLINE);
-		mvprintw(row/2 + 2, (col - title.length())/2, "%s", title.c_str());
-		// Test A_REVERSE
-		attrset(A_REVERSE);
-		mvprintw(row/2 + 3, (col - title.length())/2, "%s", title.c_str());
-		// Test A_BLINK
-		attrset(A_BLINK);
-		mvprintw(row/2 + 4, (col - title.length())/2, "%s", title.c_str());
-		// Test A_BOLD
-		attrset(A_BOLD);
-		mvprintw(row/2 + 5, (col - title.length())/2, "%s", title.c_str());
-		// Test A_UNDERLINE | A_BOLD
-		attrset(A_UNDERLINE | A_BOLD);
-		mvprintw(row/2 + 6, (col - title.length())/2, "%s", title.c_str());
-
-		// Clear the attributes
-		standend();
-
-		refresh();
-		napms(500);
-		// Get rid of the title before printing our next string. Note that it doesn't
-		// "redraw the screen from scratch" so there's no blinking (i.e. what you'd see with
-		// clear())
-		erase();
-
-		// Now print something else to test addstr()
-		mvaddstr(row/2, (col - test.length())/2, test.c_str());
-
-		refresh();
-		napms(500);
-
-		// Color the title line
-		mvchgat(row/2, 0, -1, A_NORMAL, 1, NULL);
-		// Augment the title itself
-		mvchgat(row/2, (col - test.length())/2, test.length(), 
-			A_BLINK | A_BOLD | A_UNDERLINE, 1, NULL);
-
-		// Note that we don't need refresh() if we fetch user input, interestingly...
-		c = getch();
-		if (c == 'q')
-		{
-			break;
-		}
-
-		erase();
-	}
+	menu_mode();
 
 	// End curses mode
 	endwin();
 
 	return 0;
+}
+
+void menu_mode()
+{
+	const std::string title_text = "SNAKE";
+	const std::string play_text = "Play (p)";
+	const std::string exit_text = "Exit (q)";
+
+	// Erase whatever may have been printed on the screen
+	erase();
+
+	// Generate and print menu
+	mvprintw(g_row/2, (g_col - title_text.length())/2, "%s", title_text.c_str());
+	// Rest of lines should be centered below the title, but left-aligned
+	mvprintw(g_row/2 + 1, (g_col - play_text.length())/2, "%s", play_text.c_str());
+	mvprintw(g_row/2 + 2, (g_col - play_text.length())/2, "%s", exit_text.c_str());
+
+	while (true)
+	{
+		char c = getch();
+		if (c == 'p')
+		{
+			// TODO: Implement in_game_mode()
+			return;
+		}
+		else if (c == 'q')
+		{
+			return;
+		}
+
+		// Else wait for them to press a valid key
+	}
 }
 
 void configure_stdscr()
