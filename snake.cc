@@ -1,5 +1,6 @@
 #include <ncurses.h>
 #include <string>
+#include <vector>
 
 const std::string title = "SNAKE";
 const std::string test = "WHOA";
@@ -9,8 +10,10 @@ void configure_colors();
 
 int main()
 {
-	// TODO: For testin the keypad() behavior
 	char c;
+	std::string s;
+	std::vector<char> writable_s(s.size() + 1);
+	std::copy(s.begin(), s.end(), writable_s.begin());
 
 	int row, col;
 
@@ -25,53 +28,61 @@ int main()
 	// Store the row and col of stdscr
 	getmaxyx(stdscr, row, col);
 
-	// Print title screen in the center
-	mvprintw(row/2, (col - title.length())/2, "%s", title.c_str());
-	// Test A_STANDOUT
-	attrset(A_STANDOUT);
-	mvprintw(row/2 + 1, (col - title.length())/2, "%s", title.c_str());
-	// Test A_UNDERLINE
-	attrset(A_UNDERLINE);
-	mvprintw(row/2 + 2, (col - title.length())/2, "%s", title.c_str());
-	// Test A_REVERSE
-	attrset(A_REVERSE);
-	mvprintw(row/2 + 3, (col - title.length())/2, "%s", title.c_str());
-	// Test A_BLINK
-	attrset(A_BLINK);
-	mvprintw(row/2 + 4, (col - title.length())/2, "%s", title.c_str());
-	// Test A_BOLD
-	attrset(A_BOLD);
-	mvprintw(row/2 + 5, (col - title.length())/2, "%s", title.c_str());
-	// Test A_UNDERLINE | A_BOLD
-	attrset(A_UNDERLINE | A_BOLD);
-	mvprintw(row/2 + 6, (col - title.length())/2, "%s", title.c_str());
+	while (1)
+	{
+		erase();
+		// Print title screen in the center
+		mvprintw(row/2, (col - title.length())/2, "%s", title.c_str());
+		// Test A_STANDOUT
+		attrset(A_STANDOUT);
+		mvprintw(row/2 + 1, (col - title.length())/2, "%s", title.c_str());
+		// Test A_UNDERLINE
+		attrset(A_UNDERLINE);
+		mvprintw(row/2 + 2, (col - title.length())/2, "%s", title.c_str());
+		// Test A_REVERSE
+		attrset(A_REVERSE);
+		mvprintw(row/2 + 3, (col - title.length())/2, "%s", title.c_str());
+		// Test A_BLINK
+		attrset(A_BLINK);
+		mvprintw(row/2 + 4, (col - title.length())/2, "%s", title.c_str());
+		// Test A_BOLD
+		attrset(A_BOLD);
+		mvprintw(row/2 + 5, (col - title.length())/2, "%s", title.c_str());
+		// Test A_UNDERLINE | A_BOLD
+		attrset(A_UNDERLINE | A_BOLD);
+		mvprintw(row/2 + 6, (col - title.length())/2, "%s", title.c_str());
 
-	// Clear the attributes
-	standend();
+		// Clear the attributes
+		standend();
 
-	// Pause our game, wait for user input
-	c = getch();
+		refresh();
+		napms(500);
+		// Get rid of the title before printing our next string. Note that it doesn't
+		// "redraw the screen from scratch" so there's no blinking (i.e. what you'd see with
+		// clear())
+		erase();
 
-	// Now print something else to test addstr()
-	// Get rid of the title before printing our next string. Note that it doesn't
-	// "redraw the screen from scratch" so there's no blinking (i.e. what you'd see with
-	// clear())
-	erase();
-	mvaddstr(row/2, (col - test.length())/2, test.c_str());
+		// Now print something else to test addstr()
+		mvaddstr(row/2, (col - test.length())/2, test.c_str());
 
-	// Pause our game, wait for user input
-	c = getch();
-	
-	// Color the title line
-	mvchgat(row/2, 0, -1, A_NORMAL, 1, NULL);
-	// Augment the title itself
-	mvchgat(row/2, (col - test.length())/2, test.length(), A_BLINK | A_BOLD | A_UNDERLINE, 1, NULL);
+		refresh();
+		napms(500);
 
-	// TODO: Odd, I don't seem to need this anywhere
-	//refresh();
+		// Color the title line
+		mvchgat(row/2, 0, -1, A_NORMAL, 1, NULL);
+		// Augment the title itself
+		mvchgat(row/2, (col - test.length())/2, test.length(), 
+			A_BLINK | A_BOLD | A_UNDERLINE, 1, NULL);
 
-	// Pause our game, wait for user input
-	c = getch();
+		// Note that we don't need refresh() if we fetch user input, interestingly...
+		c = getch();
+		if (c == 'q')
+		{
+			break;
+		}
+
+		erase();
+	}
 
 	// End curses mode
 	endwin();
@@ -96,6 +107,7 @@ void configure_stdscr()
 
 void configure_colors()
 {
-	// TODO: Hm these need to be bound by COLOR_PAIRS and COLORS
+	// TODO: Hm the first argument needs to be bound by COLOR_PAIRS. The latter need to be bound 
+	// COLORS if we decide not to use the 8 built in color macros
 	init_pair(1, COLOR_RED, COLOR_GREEN);
 }
