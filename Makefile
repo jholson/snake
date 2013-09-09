@@ -1,6 +1,6 @@
 CC = /usr/bin/g++
 CFLAGS =
-LIBS = -lncurses
+LIBS = -lncurses -lrt
 
 .PHONY: all clean
 
