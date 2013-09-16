@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include <string>
-#include <vector>
+#include <deque>
 
 enum GameState
 {
@@ -20,12 +20,21 @@ enum Direction
 	Right
 };
 
+struct SnakeNode
+{
+	int x, y;
+
+	SnakeNode(int row, int col) : x(row),
+	                              y(col)
+	{ }
+};
+
 int g_max_row, g_max_col;
 GameState g_state;
 
 int menu_mode();
 void in_game_mode();
-void in_game_mode_core(Direction *curr_direction);
+int in_game_mode_core(Direction *curr_direction);
 long diff_in_nanoseconds(timespec first, timespec second);
 void configure_stdscr();
 void configure_colors();
@@ -63,6 +72,9 @@ int main()
 			}
 			case InGame:
 				in_game_mode();
+
+				// Transition to menu_mode()
+				g_state = Menu;
 				break;
 			case Scoreboard:
 				break;
@@ -108,8 +120,10 @@ int menu_mode()
 void in_game_mode()
 {
 	// Init game settings
-	int curr_row = 0, curr_col = 0;
+	int curr_row = g_max_row/2, curr_col = g_max_col/2;
 	Direction curr_direction = Up;
+	std::deque<SnakeNode> snake;
+	snake.push_front (SnakeNode(curr_row, curr_col));
 	erase();
 	attrset(A_BOLD);
 
@@ -118,64 +132,73 @@ void in_game_mode()
 
 	while (true)
 	{
-		in_game_mode_core(&curr_direction);
-		/* TODO: Move this to in_game_mode_core()
-		char c = getch();
-		switch (c)
+		if (in_game_mode_core(&curr_direction) < 0)
 		{
-			case UpKeyCode:
-				curr_direction = Up; 
-				break;
-			case DownKeyCode:
-				curr_direction = Down; 
-				break;
-			case LeftKeyCode:
-				curr_direction = Left; 
-				break;
-			case RightKeyCode:
-				curr_direction = Right; 
-				break;
-			default:
-				// Wait for them to press a valid key
-				break;
+			return;
 		}
 
-		mvprintw(0, 0, "%c", c);
-
-		napms(300);
-		*/
-
-		erase();
-		mvaddstr(0,0, "napping");
-		mvaddstr(g_max_row/2 + 1, g_max_col/2, "curr direction: ");
+		// Update snake
+		snake.pop_back();
 		switch (curr_direction)
 		{
 			case Up:
-				addstr("Up");
+				curr_row--;
 				break;
 			case Down:
-				addstr("Down");
+				curr_row++;
 				break;
 			case Left:
-				addstr("Left");
+				curr_col--;
 				break;
 			case Right:
-				addstr("Right");
+				curr_col++;
 				break;
 			default:
 				// Shit broke
 				return;
 		}
+		snake.push_front(SnakeNode(curr_row, curr_col));
+
+		erase();
+
+		// Print the snake
+		mvaddch(snake.front().x, snake.front().y, ACS_BLOCK);
+
+		// Print some diagnostics
+		mvaddstr(0, 0, "napping");
+		mvaddstr(1, 0, "curr direction: ");
+		switch (curr_direction)
+		{
+			case Up:
+				addstr("Up\n");
+				break;
+			case Down:
+				addstr("Down\n");
+				break;
+			case Left:
+				addstr("Left\n");
+				break;
+			case Right:
+				addstr("Right\n");
+				break;
+			default:
+				// Shit broke
+				return;
+		}
+		mvprintw(2, 0, "col: %d, row: %d\n", curr_col, curr_row);
+
 		refresh();
-		napms(500);
+
+		// Uncomment to view the diagnostics in this method
+		//napms(100);
 	}
 }
 
-void in_game_mode_core(Direction *curr_direction)
+int in_game_mode_core(Direction *curr_direction)
 {
 	const int NANOSECONDS_PER_MILLISECOND = 1000000;
 	// In nanoseconds
-	long refresh_span = 500 * NANOSECONDS_PER_MILLISECOND;
+	long refresh_span = 100 * NANOSECONDS_PER_MILLISECOND;
 
 	// We don't want getch() to be blocking here
 	nodelay(stdscr, true);
@@ -190,8 +213,6 @@ void in_game_mode_core(Direction *curr_direction)
 		{
 			// Notice that we set the direction to whatever was the last user input
 			// before a "refresh"
-			// TODO: Alternatively, have a separate thread for processing user input with 
-			// a producer consumer model? Probably overkill
 			case KEY_UP:
 				*curr_direction = Up; 
 				break;
@@ -204,27 +225,21 @@ void in_game_mode_core(Direction *curr_direction)
 			case KEY_RIGHT:
 				*curr_direction = Right; 
 				break;
+			case 'q':
+				return -1;
 			default:
 				// Wait for them to press a valid key
 				break;
 		}
 
 		// TODO: Delete most of this
-		erase();
 		clock_gettime(CLOCK_MONOTONIC, &curr);
-		mvprintw(0, 0, "curr: %ld, start: %ld", curr.tv_nsec, start.tv_nsec);
-		mvprintw(1, 0, "curr: %ld, start: %ld", curr.tv_sec, start.tv_sec);
-		mvprintw(2, 0, "%ld", diff_in_nanoseconds(start, curr));
-		mvprintw(3, 0, "%ld", refresh_span);
-		if (inp != ERR)
-		{
-			mvprintw(4, 0, "inp: %c", inp);
-		}
-		else
-		{
-			mvaddstr(4, 0, "ERR");
-		}
-		mvprintw(5, 0, "curr_direction: %d", (int) *curr_direction);
+		// Note that a newline in these format strings seems to automatically call clrtoeol()
+		mvprintw(0, 0, "curr: %ld, start: %ld\n", curr.tv_nsec, start.tv_nsec);
+		mvprintw(1, 0, "curr: %ld, start: %ld\n", curr.tv_sec, start.tv_sec);
+		mvprintw(2, 0, "%ld\n", diff_in_nanoseconds(start, curr));
+		mvprintw(3, 0, "%ld\n", refresh_span);
+		mvprintw(4, 0, "curr_direction: %d\n", (int) *curr_direction);
 	}
 	while (diff_in_nanoseconds(start, curr) < refresh_span);
 

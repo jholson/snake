@@ -8,7 +8,7 @@ Developer set-up
 
 Style
 =====
-(robert): I am mostly following the rules from here:
+(robert): I am sort-of following the guidelines set here:
   http://google-styleguide.googlecode.com/svn/trunk/cppguide.xml
 
 Le Pro tips
