@@ -3,6 +3,7 @@
 #include <time.h>
 #include <string>
 #include <deque>
+#include <vector>
 
 enum GameState
 {
@@ -14,8 +15,8 @@ enum GameState
 
 enum Direction
 {
-	Up,
 	Down,
+	Up,
 	Left,
 	Right
 };
@@ -34,7 +35,7 @@ GameState g_state;
 
 int menu_mode();
 void in_game_mode();
-int in_game_mode_core(Direction *curr_direction);
+int in_game_mode_core();
 long diff_in_nanoseconds(timespec first, timespec second);
 void configure_stdscr();
 void configure_colors();
@@ -120,32 +121,60 @@ int menu_mode()
 void in_game_mode()
 {
 	// Init game settings
-	int curr_row = g_max_row/2, curr_col = g_max_col/2;
+	int head_row = g_max_row/2, head_col = g_max_col/2;
 	Direction curr_direction = Up;
+	// This corresponds 1 to 1 with the ncurses window, but is a cleaner abstraction than using
+	// the ncurses window for logic
+	std::vector<std::vector<int> > board(g_max_row + 1, std::vector<int>(g_max_col + 1, 0));
 	std::deque<SnakeNode> snake;
-	snake.push_front (SnakeNode(curr_row, curr_col));
+	snake.push_front(SnakeNode(head_row, head_col));
+	board[snake.front().x][snake.front().y] = 1;
 	erase();
 	attrset(A_BOLD);
 
-	// They start in the center
-	mvaddch(g_max_row/2, g_max_col/2, ACS_BLOCK);
-
 	while (true)
 	{
-		if (in_game_mode_core(&curr_direction) < 0)
+		int inp;
+		if ((inp = in_game_mode_core()) == -50)
 		{
 			return;
 		}
 
+		// Update curr_direction
+		switch (inp)
+		{
+			case KEY_DOWN:
+				curr_direction = Down;
+				break;
+			case KEY_UP:
+				curr_direction = Up;
+				break;
+			case KEY_LEFT:
+				curr_direction = Left;
+				break;
+			case KEY_RIGHT:
+				curr_direction = Right;
+				break;
+			default:
+				// No input was entered so the curr_direction stays the same
+				break;
+		}
+
 		// Update snake
+		// Tail first
+		board[snake.back().x][snake.front().y] = 0;
 		snake.pop_back();
+
+		// Now the head
+		int curr_row = snake.front().x;
+		int curr_col = snake.front().y;
 		switch (curr_direction)
 		{
-			case Up:
-				curr_row--;
-				break;
 			case Down:
 				curr_row++;
+				break;
+			case Up:
+				curr_row--;
 				break;
 			case Left:
 				curr_col--;
@@ -154,26 +183,35 @@ void in_game_mode()
 				curr_col++;
 				break;
 			default:
-				// Shit broke
+				// Game broke
 				return;
 		}
+		// Check if a collision occurred
+		// Note the short circuit logic
+		if ((curr_row < 0 || curr_row > g_max_row) ||
+		    (curr_col < 0 || curr_col > g_max_col) ||
+		    (board[curr_row][curr_col] == 1))
+		{
+			// They lost
+			return;
+		}
 		snake.push_front(SnakeNode(curr_row, curr_col));
-
-		erase();
+		// Update the board
+		board[snake.front().x][snake.front().y] = 1;
 
 		// Print the snake
 		mvaddch(snake.front().x, snake.front().y, ACS_BLOCK);
 
 		// Print some diagnostics
-		mvaddstr(0, 0, "napping");
+		mvaddstr(0, 0, "napping\n");
 		mvaddstr(1, 0, "curr direction: ");
 		switch (curr_direction)
 		{
-			case Up:
-				addstr("Up\n");
-				break;
 			case Down:
 				addstr("Down\n");
+				break;
+			case Up:
+				addstr("Up\n");
 				break;
 			case Left:
 				addstr("Left\n");
@@ -185,16 +223,16 @@ void in_game_mode()
 				// Shit broke
 				return;
 		}
-		mvprintw(2, 0, "col: %d, row: %d\n", curr_col, curr_row);
+		mvprintw(2, 0, "col: %d, row: %d\n", snake.front().y, snake.front().x);
 
 		refresh();
 
 		// Uncomment to view the diagnostics in this method
-		//napms(100);
+		//napms(1000);
 	}
 }
 
-int in_game_mode_core(Direction *curr_direction)
+int in_game_mode_core()
 {
 	const int NANOSECONDS_PER_MILLISECOND = 1000000;
 	// In nanoseconds
@@ -203,32 +241,26 @@ int in_game_mode_core(Direction *curr_direction)
 	// We don't want getch() to be blocking here
 	nodelay(stdscr, true);
 
-	int inp;
+	int inp, last_dir_inp = 0;
 	struct timespec start, curr;
 	clock_gettime(CLOCK_MONOTONIC, &start);
 	do
 	{
 		inp = getch();
+		if (inp == 'q')
+		{
+			return -50;
+		}
+
 		switch (inp)
 		{
-			// Notice that we set the direction to whatever was the last user input
-			// before a "refresh"
-			case KEY_UP:
-				*curr_direction = Up; 
-				break;
 			case KEY_DOWN:
-				*curr_direction = Down; 
-				break;
+			case KEY_UP:
 			case KEY_LEFT:
-				*curr_direction = Left; 
-				break;
 			case KEY_RIGHT:
-				*curr_direction = Right; 
+				last_dir_inp = inp;
 				break;
-			case 'q':
-				return -1;
 			default:
-				// Wait for them to press a valid key
 				break;
 		}
 
@@ -239,12 +271,15 @@ int in_game_mode_core(Direction *curr_direction)
 		mvprintw(1, 0, "curr: %ld, start: %ld\n", curr.tv_sec, start.tv_sec);
 		mvprintw(2, 0, "%ld\n", diff_in_nanoseconds(start, curr));
 		mvprintw(3, 0, "%ld\n", refresh_span);
-		mvprintw(4, 0, "curr_direction: %d\n", (int) *curr_direction);
+		mvprintw(4, 0, "inp: %d\n", inp);
 	}
 	while (diff_in_nanoseconds(start, curr) < refresh_span);
 
 	// Reset getch() to be blocking
 	nodelay(stdscr, false);
+
+	// Return whatever the last direction input
+	return last_dir_inp;
 }
 
 // TODO: Obviously not the most robust thing
