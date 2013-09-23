@@ -43,9 +43,12 @@ GameState g_state;
 
 int menu_mode();
 void in_game_mode();
-int in_game_mode_core();
+int in_game_core(std::deque<SnakeNode> &snake, std::vector<std::vector<BoardCellType> > &board,
+	Direction &curr_direction);
+int process_input(int inp, std::deque<SnakeNode> &snake,
+	std::vector<std::vector<BoardCellType> > &board, Direction &curr_direction);
 long diff_in_nanoseconds(timespec first, timespec second);
-void print_snake(std::deque<SnakeNode> snake);
+void print_board(std::deque<SnakeNode> &snake);
 void configure_stdscr();
 void configure_colors();
 
@@ -130,6 +133,7 @@ int menu_mode()
 void in_game_mode()
 {
 	// Init game settings
+	// TODO: Wrap this in a game state struct
 	Direction curr_direction = Up;
 	// We need an extra row/col because of how we deal with board edge detection
 	std::vector<std::vector<BoardCellType> > board(
@@ -142,116 +146,38 @@ void in_game_mode()
 	attrset(A_BOLD);
 
 	// TODO: Temporary to test out food
-	board[10][10] = Food;
+	board[30][30] = Food;
 
 	while (true)
 	{
-		int inp;
-		if ((inp = in_game_mode_core()) == -50)
+		if (in_game_core(snake, board, curr_direction) < 0)
 		{
+			// Game ended
 			return;
 		}
-
-		// Update curr_direction
-		switch (inp)
-		{
-			case KEY_DOWN:
-				curr_direction = Down;
-				break;
-			case KEY_UP:
-				curr_direction = Up;
-				break;
-			case KEY_LEFT:
-				curr_direction = Left;
-				break;
-			case KEY_RIGHT:
-				curr_direction = Right;
-				break;
-			default:
-				// No input was entered so the curr_direction stays the same
-				break;
-		}
-
-		// Update snake
-		// Tail first
-		board[snake.back().col][snake.front().row] = Empty;
-		snake.pop_back();
-
-		// Now the head
-		int curr_col = snake.front().col;
-		int curr_row = snake.front().row;
-		switch (curr_direction)
-		{
-			case Down:
-				curr_row++;
-				break;
-			case Up:
-				curr_row--;
-				break;
-			case Left:
-				curr_col--;
-				break;
-			case Right:
-				curr_col++;
-				break;
-			default:
-				// Game broke
-				return;
-		}
-		// Check if a collision occurred
-		// Note the short circuit logic
-		if ((curr_row < 0 || curr_row > g_max_row) ||
-		    (curr_col < 0 || curr_col > g_max_col) ||
-		    (board[curr_row][curr_col] == Snake))
-		{
-			// They lost
-			return;
-		}
-		snake.push_front(SnakeNode(curr_col, curr_row));
-		// Update the board
-		board[snake.front().col][snake.front().row] = Snake;
-
-		print_snake(snake);
 
 		// Print some diagnostics
-		mvaddstr(0, 0, "napping\n");
-		mvaddstr(1, 0, "curr direction: ");
-		switch (curr_direction)
-		{
-			case Down:
-				addstr("Down\n");
-				break;
-			case Up:
-				addstr("Up\n");
-				break;
-			case Left:
-				addstr("Left\n");
-				break;
-			case Right:
-				addstr("Right\n");
-				break;
-			default:
-				// Shit broke
-				return;
-		}
-		mvprintw(2, 0, "col: %d, row: %d\n", snake.front().col, snake.front().row);
+		mvprintw(0, 0, "col: %d, row: %d\n", snake.front().col, snake.front().row);
+		mvprintw(1, 0, "curr_direction: %d\n", curr_direction);
 
 		refresh();
 
 		// Uncomment to view the diagnostics in this method
-		//napms(1000);
+		//napms(100);
 	}
 }
 
-int in_game_mode_core()
+int in_game_core(std::deque<SnakeNode> &snake, std::vector<std::vector<BoardCellType> > &board, 
+	Direction &curr_direction)
 {
 	const int NANOSECONDS_PER_MILLISECOND = 1000000;
 	// In nanoseconds
-	long refresh_span = 100 * NANOSECONDS_PER_MILLISECOND;
+	long refresh_duration = 100 * NANOSECONDS_PER_MILLISECOND;
 
 	// We don't want getch() to be blocking here
 	nodelay(stdscr, true);
 
+	// First, read characters until refresh_duration has elapsed
 	int inp, last_dir_inp = 0;
 	struct timespec start, curr;
 	clock_gettime(CLOCK_MONOTONIC, &start);
@@ -260,7 +186,7 @@ int in_game_mode_core()
 		inp = getch();
 		if (inp == 'q')
 		{
-			return -50;
+			return -1;
 		}
 
 		// Update last_dir_inp if they pressed a key corresponding to a direction
@@ -281,16 +207,22 @@ int in_game_mode_core()
 		mvprintw(0, 0, "curr: %ld, start: %ld\n", curr.tv_nsec, start.tv_nsec);
 		mvprintw(1, 0, "curr: %ld, start: %ld\n", curr.tv_sec, start.tv_sec);
 		mvprintw(2, 0, "%ld\n", diff_in_nanoseconds(start, curr));
-		mvprintw(3, 0, "%ld\n", refresh_span);
+		mvprintw(3, 0, "%ld\n", refresh_duration);
 		mvprintw(4, 0, "inp: %d\n", inp);
 	}
-	while (diff_in_nanoseconds(start, curr) < refresh_span);
+	while (diff_in_nanoseconds(start, curr) < refresh_duration);
+
+	if (process_input(last_dir_inp, snake, board, curr_direction) < 0)
+	{
+		return -1;
+	}
+
+	print_board(snake);
 
 	// Reset getch() to be blocking
 	nodelay(stdscr, false);
 
-	// Return whatever the last direction input was, if any
-	return last_dir_inp;
+	return 0;
 }
 
 // TODO: Obviously not the most robust thing
@@ -301,13 +233,81 @@ long diff_in_nanoseconds(timespec first, timespec second)
 		(second.tv_nsec - first.tv_nsec);
 }
 
-void print_snake(std::deque<SnakeNode> snake)
+int process_input(int inp, std::deque<SnakeNode> &snake,
+	std::vector<std::vector<BoardCellType> > &board, Direction &curr_direction)
+{
+	// Update curr_direction
+	switch (inp)
+	{
+		case KEY_DOWN:
+			curr_direction = Down;
+			break;
+		case KEY_UP:
+			curr_direction = Up;
+			break;
+		case KEY_LEFT:
+			curr_direction = Left;
+			break;
+		case KEY_RIGHT:
+			curr_direction = Right;
+			break;
+		default:
+			// No input was entered so the curr_direction stays the same
+			break;
+	}
+
+	// Update snake
+	// Tail first
+	board[snake.back().col][snake.front().row] = Empty;
+	snake.pop_back();
+
+	// Now the head
+	int curr_col = snake.front().col;
+	int curr_row = snake.front().row;
+	switch (curr_direction)
+	{
+		case Down:
+			curr_row++;
+			break;
+		case Up:
+			curr_row--;
+			break;
+		case Left:
+			curr_col--;
+			break;
+		case Right:
+			curr_col++;
+			break;
+		default:
+			// Game broke
+			return -1;
+	}
+	// Check if a collision occurred
+	// Note the short circuit logic
+	if ((curr_row < 0 || curr_row > g_max_row) ||
+	    (curr_col < 0 || curr_col > g_max_col) ||
+	    (board[curr_row][curr_col] == Snake))
+	{
+		// They lost
+		return -1;
+	}
+	snake.push_front(SnakeNode(curr_col, curr_row));
+	// Update the board
+	board[snake.front().col][snake.front().row] = Snake;
+
+	return 0;
+}
+
+void print_board(std::deque<SnakeNode> &snake)
 {
 	erase();
 	for (std::deque<SnakeNode>::iterator it = snake.begin(); it != snake.end(); it++)
 	{
 		mvaddch((*it).row, (*it).col, ACS_BLOCK);
 	}
+
+	// TODO: Testing out food
+	mvaddch(30, 30, ACS_PI);
 }
 
 void configure_stdscr()
