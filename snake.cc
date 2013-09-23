@@ -23,13 +23,21 @@ enum Direction
 
 struct SnakeNode
 {
-	int x, y;
+	int col, row;
 
-	SnakeNode(int row, int col) : x(row),
-	                              y(col)
+	SnakeNode(int col, int row) : col(col),
+	                              row(row)
 	{ }
 };
 
+enum BoardCellType
+{
+	Empty = 0,
+	Snake = 1,
+	Food = 2
+};
+
+// Globals
 int g_max_row, g_max_col;
 GameState g_state;
 
@@ -37,6 +45,7 @@ int menu_mode();
 void in_game_mode();
 int in_game_mode_core();
 long diff_in_nanoseconds(timespec first, timespec second);
+void print_snake(std::deque<SnakeNode> snake);
 void configure_stdscr();
 void configure_colors();
 
@@ -121,16 +130,19 @@ int menu_mode()
 void in_game_mode()
 {
 	// Init game settings
-	int head_row = g_max_row/2, head_col = g_max_col/2;
 	Direction curr_direction = Up;
-	// This corresponds 1 to 1 with the ncurses window, but is a cleaner abstraction than using
-	// the ncurses window for logic
-	std::vector<std::vector<int> > board(g_max_row + 1, std::vector<int>(g_max_col + 1, 0));
+	// We need an extra row/col because of how we deal with board edge detection
+	std::vector<std::vector<BoardCellType> > board(
+		g_max_row + 1, std::vector<BoardCellType>(g_max_col + 1, Empty));
 	std::deque<SnakeNode> snake;
-	snake.push_front(SnakeNode(head_row, head_col));
-	board[snake.front().x][snake.front().y] = 1;
+	snake.push_front(SnakeNode(g_max_col/2, g_max_row/2));
+	// This uses the same style as the ncurses window so (x, y) <-> [x][y] <-> (col, row)
+	board[snake.front().col][snake.front().row] = Snake;
 	erase();
 	attrset(A_BOLD);
+
+	// TODO: Temporary to test out food
+	board[10][10] = Food;
 
 	while (true)
 	{
@@ -162,12 +174,12 @@ void in_game_mode()
 
 		// Update snake
 		// Tail first
-		board[snake.back().x][snake.front().y] = 0;
+		board[snake.back().col][snake.front().row] = Empty;
 		snake.pop_back();
 
 		// Now the head
-		int curr_row = snake.front().x;
-		int curr_col = snake.front().y;
+		int curr_col = snake.front().col;
+		int curr_row = snake.front().row;
 		switch (curr_direction)
 		{
 			case Down:
@@ -190,17 +202,16 @@ void in_game_mode()
 		// Note the short circuit logic
 		if ((curr_row < 0 || curr_row > g_max_row) ||
 		    (curr_col < 0 || curr_col > g_max_col) ||
-		    (board[curr_row][curr_col] == 1))
+		    (board[curr_row][curr_col] == Snake))
 		{
 			// They lost
 			return;
 		}
-		snake.push_front(SnakeNode(curr_row, curr_col));
+		snake.push_front(SnakeNode(curr_col, curr_row));
 		// Update the board
-		board[snake.front().x][snake.front().y] = 1;
+		board[snake.front().col][snake.front().row] = Snake;
 
-		// Print the snake
-		mvaddch(snake.front().x, snake.front().y, ACS_BLOCK);
+		print_snake(snake);
 
 		// Print some diagnostics
 		mvaddstr(0, 0, "napping\n");
@@ -223,7 +234,7 @@ void in_game_mode()
 				// Shit broke
 				return;
 		}
-		mvprintw(2, 0, "col: %d, row: %d\n", snake.front().y, snake.front().x);
+		mvprintw(2, 0, "col: %d, row: %d\n", snake.front().col, snake.front().row);
 
 		refresh();
 
@@ -252,6 +263,7 @@ int in_game_mode_core()
 			return -50;
 		}
 
+		// Update last_dir_inp if they pressed a key corresponding to a direction
 		switch (inp)
 		{
 			case KEY_DOWN:
@@ -264,9 +276,8 @@ int in_game_mode_core()
 				break;
 		}
 
-		// TODO: Delete most of this
+		// Print diagnostics
 		clock_gettime(CLOCK_MONOTONIC, &curr);
-		// Note that a newline in these format strings seems to automatically call clrtoeol()
 		mvprintw(0, 0, "curr: %ld, start: %ld\n", curr.tv_nsec, start.tv_nsec);
 		mvprintw(1, 0, "curr: %ld, start: %ld\n", curr.tv_sec, start.tv_sec);
 		mvprintw(2, 0, "%ld\n", diff_in_nanoseconds(start, curr));
@@ -278,7 +289,7 @@ int in_game_mode_core()
 	// Reset getch() to be blocking
 	nodelay(stdscr, false);
 
-	// Return whatever the last direction input
+	// Return whatever the last direction input was, if any
 	return last_dir_inp;
 }
 
@@ -288,6 +299,15 @@ long diff_in_nanoseconds(timespec first, timespec second)
 	const long NANOSECONDS_PER_SECOND = 1000000000;
 	return (second.tv_sec - first.tv_sec) * NANOSECONDS_PER_SECOND + 
 		(second.tv_nsec - first.tv_nsec);
+}
+
+void print_snake(std::deque<SnakeNode> snake)
+{
+	erase();
+	for (std::deque<SnakeNode>::iterator it = snake.begin(); it != snake.end(); it++)
+	{
+		mvaddch((*it).row, (*it).col, ACS_BLOCK);
+	}
 }
 
 void configure_stdscr()
