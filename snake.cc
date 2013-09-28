@@ -5,7 +5,7 @@
 #include <deque>
 #include <vector>
 
-enum GameState
+enum GameStatus
 {
 	Menu,
 	InGame,
@@ -37,9 +37,16 @@ enum BoardCellType
 	Food = 2
 };
 
+struct GameState
+{
+	std::deque<SnakeNode> snake;
+	std::vector<std::vector<BoardCellType> > board;
+	int food_row, food_col;
+};
+
 // Globals
 int g_max_row, g_max_col;
-GameState g_state;
+GameStatus g_status;
 
 int menu_mode();
 void in_game_mode();
@@ -61,13 +68,13 @@ int main()
 	configure_stdscr();
 	configure_colors();
 
-	// Initialize game g_state
+	// Initialize game g_status
 	getmaxyx(stdscr, g_max_row, g_max_col);
-	g_state = Menu;
+	g_status = Menu;
 
 	while (true)
 	{
-		switch (g_state)
+		switch (g_status)
 		{
 			case Menu:
 			{	
@@ -80,14 +87,14 @@ int main()
 					return 0;
 				}
 
-				// Otherwise swap to whatever is the next GameState
+				// Otherwise swap to whatever is the next GameStatus
 				break;
 			}
 			case InGame:
 				in_game_mode();
 
 				// Transition to menu_mode()
-				g_state = Menu;
+				g_status = Menu;
 				break;
 			case Scoreboard:
 				break;
@@ -118,7 +125,7 @@ int menu_mode()
 		char c = getch();
 		if (c == 'p')
 		{
-			g_state = InGame;
+			g_status = InGame;
 			return 0;
 		}
 		else if (c == 'q')
@@ -140,17 +147,18 @@ void in_game_mode()
 		g_max_row + 1, std::vector<BoardCellType>(g_max_col + 1, Empty));
 	std::deque<SnakeNode> snake;
 	snake.push_front(SnakeNode(g_max_col/2, g_max_row/2));
-	// This uses the same style as the ncurses window so (x, y) <-> [x][y] <-> (col, row)
-	board[snake.front().col][snake.front().row] = Snake;
+	// TODO: Temporarily hard-coded for testing
+	int food_col = 30, food_row = 30;
 	erase();
 	attrset(A_BOLD);
 
-	// TODO: Temporary to test out food
-	board[30][30] = Food;
+	// This uses the same style as the ncurses window so (x, y) <-> [x][y] <-> (col, row)
+	board[food_col][food_row] = Food;
+	board[snake.front().col][snake.front().row] = Snake;
 
 	while (true)
 	{
-		if (in_game_core(snake, board, curr_direction) < 0)
+		if (in_game_core(snake, food_col, food_row, board, curr_direction) < 0)
 		{
 			// Game ended
 			return;
@@ -174,10 +182,13 @@ int in_game_core(std::deque<SnakeNode> &snake, std::vector<std::vector<BoardCell
 	// In nanoseconds
 	long refresh_duration = 100 * NANOSECONDS_PER_MILLISECOND;
 
+	// Process snake before the "round" starts (basically, check for collision with food)
+	bool extend_snake = update_food(snake, board);
+
+	// Next the "round" occurs which consists of reading user input until refresh_duration has
+	// elapsed
 	// We don't want getch() to be blocking here
 	nodelay(stdscr, true);
-
-	// First, read characters until refresh_duration has elapsed
 	int inp, last_dir_inp = 0;
 	struct timespec start, curr;
 	clock_gettime(CLOCK_MONOTONIC, &start);
@@ -211,16 +222,17 @@ int in_game_core(std::deque<SnakeNode> &snake, std::vector<std::vector<BoardCell
 		mvprintw(4, 0, "inp: %d\n", inp);
 	}
 	while (diff_in_nanoseconds(start, curr) < refresh_duration);
+	// Reset getch() to be blocking
+	nodelay(stdscr, false);
 
+	// Now we're done with the main portion of "round", process the results of it
 	if (process_input(last_dir_inp, snake, board, curr_direction) < 0)
 	{
 		return -1;
 	}
 
+	// Finally update the board
 	print_board(snake);
-
-	// Reset getch() to be blocking
-	nodelay(stdscr, false);
 
 	return 0;
 }
@@ -232,6 +244,8 @@ long diff_in_nanoseconds(timespec first, timespec second)
 	return (second.tv_sec - first.tv_sec) * NANOSECONDS_PER_SECOND + 
 		(second.tv_nsec - first.tv_nsec);
 }
+
+bool update_food(std::deque<SnakeNode> &snake, std::vector
 
 int process_input(int inp, std::deque<SnakeNode> &snake,
 	std::vector<std::vector<BoardCellType> > &board, Direction &curr_direction)
