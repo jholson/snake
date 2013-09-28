@@ -5,8 +5,6 @@
 #include <deque>
 #include <vector>
 
-foo
-
 enum GameStatus
 {
 	Menu,
