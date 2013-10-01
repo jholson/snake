@@ -144,8 +144,8 @@ void in_game_mode()
 	{
 		std::deque<SnakeNode>(), // snake
 		std::vector<std::vector<BoardCellType> >(
-			g_max_row,
-			std::vector<BoardCellType>(g_max_col, Empty)), // board
+			g_max_col,
+			std::vector<BoardCellType>(g_max_row, Empty)), // board
 		Up, // curr_direction
 		// TODO: Temporarily hard-coded for testing
 		30, // food_col
@@ -245,12 +245,6 @@ long diff_in_nanoseconds(timespec first, timespec second)
 	const long NANOSECONDS_PER_SECOND = 1000000000;
 	return (second.tv_sec - first.tv_sec) * NANOSECONDS_PER_SECOND + 
 		(second.tv_nsec - first.tv_nsec);
-}
-
-bool update_food(GameState &game_state)
-{
-	// TODO:
-	return true;
 }
 
 int process_input(int inp, GameState &game_state)
