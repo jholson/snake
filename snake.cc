@@ -149,8 +149,7 @@ void in_game_mode()
 	{
 		std::deque<SnakeNode>(), // snake
 		std::vector<std::vector<BoardCellType> >(
-			g_max_col,
-			std::vector<BoardCellType>(g_max_row, Empty)), // board
+			g_max_col + 1, std::vector<BoardCellType>(g_max_row + 1, Empty)), // board
 		Up // curr_direction
 	};
 	// Start the snake of size 1 in the middle of the board
@@ -168,11 +167,12 @@ void in_game_mode()
 		}
 
 		// Print some diagnostics
-		mvprintw(5, 0, "col: %d, row: %d\n", game_state.snake.front().col, 
+		mvprintw(5, 0, "col_max: %d, row_max: %d\n", g_max_col, g_max_row);
+		mvprintw(6, 0, "col: %d, row: %d\n", game_state.snake.front().col, 
 			game_state.snake.front().row);
-		mvprintw(6, 0, "food_col: %d, food_row: %d\n", game_state.food_col,
+		mvprintw(7, 0, "food_col: %d, food_row: %d\n", game_state.food_col,
 			game_state.food_row);
-		mvprintw(7, 0, "curr_direction: %d\n", game_state.curr_direction);
+		mvprintw(8, 0, "curr_direction: %d\n", game_state.curr_direction);
 
 		refresh();
 	}
@@ -182,7 +182,7 @@ int in_game_core(InGameState &game_state)
 {
 	const int NANOSECONDS_PER_MILLISECOND = 1000000;
 	// In nanoseconds
-	long refresh_duration = 100 * NANOSECONDS_PER_MILLISECOND;
+	long refresh_duration = 70 * NANOSECONDS_PER_MILLISECOND;
 
 	// Next the "round" occurs which consists of reading user input until refresh_duration has
 	// elapsed
@@ -200,16 +200,9 @@ int in_game_core(InGameState &game_state)
 		}
 
 		// Update last_dir_inp if they pressed a key corresponding to a direction
-		switch (inp)
+		if (inp == KEY_DOWN || inp == KEY_UP || inp == KEY_LEFT || inp == KEY_RIGHT)
 		{
-			case KEY_DOWN:
-			case KEY_UP:
-			case KEY_LEFT:
-			case KEY_RIGHT:
-				last_dir_inp = inp;
-				break;
-			default:
-				break;
+			last_dir_inp = inp;
 		}
 
 		// Print diagnostics
@@ -246,20 +239,33 @@ long diff_in_nanoseconds(timespec first, timespec second)
 
 int process_input(int inp, InGameState &game_state)
 {
-	// Map input to a direction
+	// Map input to a direction. We don't allow the user to go directly back into the snake (and
+	// kill themselves instantly)
 	switch (inp)
 	{
 		case KEY_DOWN:
-			game_state.curr_direction = Down;
+			if (game_state.curr_direction != Up)
+			{
+				game_state.curr_direction = Down;
+			}
 			break;
 		case KEY_UP:
-			game_state.curr_direction = Up;
+			if (game_state.curr_direction != Down)
+			{
+				game_state.curr_direction = Up;
+			}
 			break;
 		case KEY_LEFT:
-			game_state.curr_direction = Left;
+			if (game_state.curr_direction != Right)
+			{
+				game_state.curr_direction = Left;
+			}
 			break;
 		case KEY_RIGHT:
-			game_state.curr_direction = Right;
+			if (game_state.curr_direction != Left)
+			{
+				game_state.curr_direction = Right;
+			}
 			break;
 		default:
 			// No input was entered so the curr_direction stays the same
