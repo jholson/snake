@@ -166,6 +166,7 @@ void in_game_mode()
 			return;
 		}
 
+#ifdef DEBUG
 		// Print some diagnostics
 		mvprintw(5, 0, "col_max: %d, row_max: %d\n", g_max_col, g_max_row);
 		mvprintw(6, 0, "col: %d, row: %d\n", game_state.snake.front().col, 
@@ -173,8 +174,8 @@ void in_game_mode()
 		mvprintw(7, 0, "food_col: %d, food_row: %d\n", game_state.food_col,
 			game_state.food_row);
 		mvprintw(8, 0, "curr_direction: %d\n", game_state.curr_direction);
-
 		refresh();
+#endif
 	}
 }
 
@@ -207,11 +208,13 @@ int in_game_core(InGameState &game_state)
 
 		// Print diagnostics
 		clock_gettime(CLOCK_MONOTONIC, &curr);
+#ifdef DEBUG
 		mvprintw(0, 0, "curr: %ld, start: %ld\n", curr.tv_nsec, start.tv_nsec);
 		mvprintw(1, 0, "curr: %ld, start: %ld\n", curr.tv_sec, start.tv_sec);
 		mvprintw(2, 0, "%ld\n", diff_in_nanoseconds(start, curr));
 		mvprintw(3, 0, "%ld\n", refresh_duration);
 		mvprintw(4, 0, "inp: %d\n", last_dir_inp);
+#endif
 	}
 	while (diff_in_nanoseconds(start, curr) < refresh_duration);
 	// Reset getch() to be blocking
