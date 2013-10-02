@@ -37,12 +37,13 @@ enum BoardCellType
 	Food = 2
 };
 
-struct GameState
+struct InGameState
 {
 	std::deque<SnakeNode> snake;
+	// This should use the same style as the ncurses window so (x, y) <-> [x][y] <-> (col, row)
 	std::vector<std::vector<BoardCellType> > board;
 	Direction curr_direction;
-	int food_row, food_col;
+	int food_col, food_row;
 };
 
 // Globals
@@ -51,11 +52,11 @@ GameStatus g_status;
 
 int menu_mode();
 void in_game_mode();
-int in_game_core(GameState &game_state);
-int process_input(int inp, GameState &game_state);
+int in_game_core(InGameState &game_state);
+int process_input(int inp, InGameState &game_state);
 long diff_in_nanoseconds(timespec first, timespec second);
-void generate_food(GameState &game_state);
-void print_game(GameState &game_state);
+void generate_food(InGameState &game_state);
+void print_game(InGameState &game_state);
 void configure_stdscr();
 void configure_colors();
 
@@ -68,9 +69,10 @@ int main()
 	configure_stdscr();
 	configure_colors();
 
-	// Initialize game g_status
+	// Initialize global game state
 	getmaxyx(stdscr, g_max_row, g_max_col);
 	g_status = Menu;
+	srand(time(NULL));
 
 	while (true)
 	{
@@ -140,26 +142,22 @@ int menu_mode()
 void in_game_mode()
 {
 	// Init game settings
-	GameState game_state =
+	erase();
+	attrset(A_BOLD);
+
+	InGameState game_state =
 	{
 		std::deque<SnakeNode>(), // snake
 		std::vector<std::vector<BoardCellType> >(
 			g_max_col,
 			std::vector<BoardCellType>(g_max_row, Empty)), // board
-		Up, // curr_direction
-		// TODO: Temporarily hard-coded for testing
-		30, // food_col
-		30 // food_row
+		Up // curr_direction
 	};
 	// Start the snake of size 1 in the middle of the board
 	game_state.snake.push_front(SnakeNode(g_max_col/2, g_max_row/2));
-
-	erase();
-	attrset(A_BOLD);
-
-	// This uses the same style as the ncurses window so (x, y) <-> [x][y] <-> (col, row)
 	game_state.board[game_state.food_col][game_state.food_row] = Food;
 	game_state.board[game_state.snake.front().col][game_state.snake.front().row] = Snake;
+	generate_food(game_state);
 
 	while (true)
 	{
@@ -170,18 +168,17 @@ void in_game_mode()
 		}
 
 		// Print some diagnostics
-		mvprintw(0, 0, "col: %d, row: %d\n", game_state.snake.front().col, 
+		mvprintw(5, 0, "col: %d, row: %d\n", game_state.snake.front().col, 
 			game_state.snake.front().row);
-		mvprintw(1, 0, "curr_direction: %d\n", game_state.curr_direction);
+		mvprintw(6, 0, "food_col: %d, food_row: %d\n", game_state.food_col,
+			game_state.food_row);
+		mvprintw(7, 0, "curr_direction: %d\n", game_state.curr_direction);
 
 		refresh();
-
-		// Uncomment to view the diagnostics in this method
-		//napms(100);
 	}
 }
 
-int in_game_core(GameState &game_state)
+int in_game_core(InGameState &game_state)
 {
 	const int NANOSECONDS_PER_MILLISECOND = 1000000;
 	// In nanoseconds
@@ -221,7 +218,7 @@ int in_game_core(GameState &game_state)
 		mvprintw(1, 0, "curr: %ld, start: %ld\n", curr.tv_sec, start.tv_sec);
 		mvprintw(2, 0, "%ld\n", diff_in_nanoseconds(start, curr));
 		mvprintw(3, 0, "%ld\n", refresh_duration);
-		mvprintw(4, 0, "inp: %d\n", inp);
+		mvprintw(4, 0, "inp: %d\n", last_dir_inp);
 	}
 	while (diff_in_nanoseconds(start, curr) < refresh_duration);
 	// Reset getch() to be blocking
@@ -247,7 +244,7 @@ long diff_in_nanoseconds(timespec first, timespec second)
 		(second.tv_nsec - first.tv_nsec);
 }
 
-int process_input(int inp, GameState &game_state)
+int process_input(int inp, InGameState &game_state)
 {
 	// Map input to a direction
 	switch (inp)
@@ -295,7 +292,7 @@ int process_input(int inp, GameState &game_state)
 	if ((curr_row < 0 || curr_row > g_max_row) ||
 	    (curr_col < 0 || curr_col > g_max_col) ||
 	    // Short circuit is critical here due to index out of bounds
-	    (game_state.board[curr_row][curr_col] == Snake))
+	    (game_state.board[curr_col][curr_row] == Snake))
 	{
 		// They lost
 		return -1;
@@ -321,7 +318,7 @@ int process_input(int inp, GameState &game_state)
 	return 0;
 }
 
-void generate_food(GameState &game_state)
+void generate_food(InGameState &game_state)
 {
 	// TODO: Since the board is small we can actually enumerate the entire thing. Since the
 	// snake could theoretically cover (almost) the entire board it doesn't seem asymptotically
@@ -339,9 +336,15 @@ void generate_food(GameState &game_state)
 			}
 		}
 	}
+
+	// Generate next food location
+	std::pair<int, int> food_loc = empty_cells[rand() % empty_cells.size()];
+	game_state.food_col = food_loc.first;
+	game_state.food_row = food_loc.second;
+	game_state.board[food_loc.first][food_loc.second] = Food;
 }
 
-void print_game(GameState &game_state)
+void print_game(InGameState &game_state)
 {
 	erase();
 	for (std::deque<SnakeNode>::iterator it = game_state.snake.begin();
@@ -350,7 +353,7 @@ void print_game(GameState &game_state)
 		mvaddch((*it).row, (*it).col, ACS_BLOCK);
 	}
 
-	mvaddch(game_state.food_col, game_state.food_row, ACS_PI);
+	mvaddch(game_state.food_row, game_state.food_col, ACS_PI);
 }
 
 void configure_stdscr()
