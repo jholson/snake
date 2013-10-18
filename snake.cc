@@ -1,9 +1,10 @@
+#include <deque>
+#include <string>
+#include <vector>
+
 #include <ncurses.h>
 #include <stdlib.h>
 #include <time.h>
-#include <string>
-#include <deque>
-#include <vector>
 
 enum GameStatus
 {
@@ -79,7 +80,7 @@ int main()
 		switch (g_status)
 		{
 			case Menu:
-			{	
+			{
 				int ret = menu_mode();
 				if (ret < 0)
 				{
@@ -169,7 +170,7 @@ void in_game_mode()
 #ifdef DEBUG
 		// Print some diagnostics
 		mvprintw(5, 0, "col_max: %d, row_max: %d\n", g_max_col, g_max_row);
-		mvprintw(6, 0, "col: %d, row: %d\n", game_state.snake.front().col, 
+		mvprintw(6, 0, "col: %d, row: %d\n", game_state.snake.front().col,
 			game_state.snake.front().row);
 		mvprintw(7, 0, "food_col: %d, food_row: %d\n", game_state.food_col,
 			game_state.food_row);
@@ -236,7 +237,7 @@ int in_game_core(InGameState &game_state)
 long diff_in_nanoseconds(timespec first, timespec second)
 {
 	const long NANOSECONDS_PER_SECOND = 1000000000;
-	return (second.tv_sec - first.tv_sec) * NANOSECONDS_PER_SECOND + 
+	return (second.tv_sec - first.tv_sec) * NANOSECONDS_PER_SECOND +
 		(second.tv_nsec - first.tv_nsec);
 }
 
@@ -314,7 +315,7 @@ int process_input(int inp, InGameState &game_state)
 		game_state.snake.front().row == game_state.food_row)
 	{
 		// Then we ate food, so we "grow" the snake by... not making it shorter
-		
+
 		// Now generate new food
 		generate_food(game_state);
 	}
@@ -323,7 +324,7 @@ int process_input(int inp, InGameState &game_state)
 		game_state.board[game_state.snake.back().col][game_state.snake.back().row] = Empty;
 		game_state.snake.pop_back();
 	}
-	
+
 	return 0;
 }
 
@@ -367,7 +368,7 @@ void print_game(InGameState &game_state)
 
 void configure_stdscr()
 {
-	// Disable line buffering, but characters are still echo'd to the terminal like 
+	// Disable line buffering, but characters are still echo'd to the terminal like
 	// ctrl-z
 	cbreak();
 
@@ -381,7 +382,7 @@ void configure_stdscr()
 
 void configure_colors()
 {
-	// TODO: Hm the first argument needs to be bound by COLOR_PAIRS. The latter need to be bound 
+	// TODO: Hm the first argument needs to be bound by COLOR_PAIRS. The latter need to be bound
 	// COLORS if we decide not to use the 8 built in color macros
 	init_pair(1, COLOR_RED, COLOR_GREEN);
 }

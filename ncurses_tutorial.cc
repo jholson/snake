@@ -1,6 +1,7 @@
-#include <ncurses.h>
 #include <string>
 #include <vector>
+
+#include <ncurses.h>
 
 const std::string title = "SNAKE";
 const std::string test = "WHOA";
@@ -74,7 +75,7 @@ int main()
 		// Color the title line
 		mvchgat(row/2, 0, -1, A_NORMAL, 1, NULL);
 		// Augment the title itself
-		mvchgat(row/2, (col - test.length())/2, test.length(), 
+		mvchgat(row/2, (col - test.length())/2, test.length(),
 			A_BLINK | A_BOLD | A_UNDERLINE, 1, NULL);
 
 		// Test chgat()
@@ -99,7 +100,7 @@ int main()
 
 void configure_stdscr()
 {
-	// Disable line buffering, but characters are still echo'd to the terminal like 
+	// Disable line buffering, but characters are still echo'd to the terminal like
 	// ctrl-z
 	cbreak();
 
@@ -114,7 +115,7 @@ void configure_stdscr()
 
 void configure_colors()
 {
-	// TODO: Hm the first argument needs to be bound by COLOR_PAIRS. The latter need to be bound 
+	// TODO: Hm the first argument needs to be bound by COLOR_PAIRS. The latter need to be bound
 	// COLORS if we decide not to use the 8 built in color macros
 	init_pair(1, COLOR_RED, COLOR_GREEN);
 }
